@@ -19,25 +19,16 @@ pip install pandas numpy yfinance matplotlib scipy mpldatacursor
 Usage
 
     Clone this repository:
+    git clone https://github.com/your-username/your-repo-name.git
 
-bash
+Open the rrg_indicator.py file and modify the following variables to suit your needs:
 
-git clone https://github.com/your-username/your-repo-name.git
-
-    Navigate to the repository directory:
-
-bash
-
-cd your-repo-name
-
-    Open the rrg_indicator.py file and modify the following variables to suit your needs:
-
-    period: the period of historical prices to retrieve (e.g., '1y', '3mo', '5d')
-    tickers: a list of ticker symbols for the assets you want to analyze
-    tail: the number of historical data points to display as markers (default is 5)
-    tickers_to_show: a list of ticker symbols to show in the scatter plot (default is all tickers)
-    benchmark: the benchmark asset to use for comparison (default is '^STOXX')
-    window: the window size for rolling calculations (default is 14)
+period: the period of historical prices to retrieve (e.g., '1y', '3mo', '5d')
+tickers: a list of ticker symbols for the assets you want to analyze
+tail: the number of historical data points to display as markers (default is 5)
+tickers_to_show: a list of ticker symbols to show in the scatter plot (default is all tickers)
+benchmark: the benchmark asset to use for comparison (default is '^STOXX')
+window: the window size for rolling calculations (default is 14)
 
     Run the script:
 
