@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from scipy import interpolate
 from matplotlib.widgets import Slider, Button
-import mpldatacursor
+import tkinter as tk
+from tkinter import ttk
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg,
+    NavigationToolbar2Tk
+)
 
 is_playing = False
 marker_size = []
@@ -56,7 +61,7 @@ for i in range(len(tickers)):
     tickers_metadata_dict['symbol'].append(info['symbol'])
     tickers_metadata_dict['name'].append(info['longName'])
 
-tickers_to_show = tickers
+tickers_to_show = tickers.copy()
 
 benchmark = '^STOXX'
 
@@ -79,9 +84,24 @@ for i in range(len(tickers)):
     rsr_tickers[i] = rsr_tickers[i][rsr_tickers[i].index.isin(rsm_tickers[i].index)]
     rsm_tickers[i] = rsm_tickers[i][rsm_tickers[i].index.isin(rsr_tickers[i].index)]
 
+def update_rrg():
+    rs_tickers = []
+    rsr_tickers = []
+    rsr_roc_tickers = []
+    rsm_tickers = []
+
+    for i in range(len(tickers)):
+        rs_tickers.append(100 * (tickers_data[tickers[i]]/ benchmark_data))
+        rsr_tickers.append((100 + (rs_tickers[i] - rs_tickers[i].rolling(window=window).mean()) / rs_tickers[i].rolling(window=window).std(ddof=0)).dropna())
+        rsr_roc_tickers.append(100 * ((rsr_tickers[i]/ rsr_tickers[i][1]) - 1))
+        rsm_tickers.append((101 + ((rsr_roc_tickers[i] - rsr_roc_tickers[i].rolling(window=window).mean()) / rsr_roc_tickers[i].rolling(window=window).std(ddof=0))).dropna())
+        rsr_tickers[i] = rsr_tickers[i][rsr_tickers[i].index.isin(rsm_tickers[i].index)]
+        rsm_tickers[i] = rsm_tickers[i][rsm_tickers[i].index.isin(rsr_tickers[i].index)]
+
+root = tk.Tk()
 # Create scatter plot of JdK RS Ratio vs JdK RS Momentum
 # Upper plot is JdK RS Ratio vs JdK RS Momentum and below is a table of the status of each ticker
-fig, ax = plt.subplots(2, 1, figsize=(10, 10), gridspec_kw={'height_ratios': [3, 1]})
+fig, ax = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]})
 ax[0].set_title('RRG Indicator')
 ax[0].set_xlabel('JdK RS Ratio')
 ax[0].set_ylabel('JdK RS Momentum')
@@ -104,17 +124,12 @@ ax[0].text(95, 95, 'Lagging')
 ax[0].set_xlim(94, 106)
 ax[0].set_ylim(94, 106)
 
+# Add plot to canvas 
+canvas = FigureCanvasTkAgg(fig, master=root)
+canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
 ax[1].set_axis_off()
 collabels = ['symbol', 'name', 'sector', 'industry', 'price', 'chg']
-
-table = ax[1].table(cellText=[[''] * len(collabels)], colLabels=collabels, loc='center', colWidths=[0.1, 0.2, 0.2, 0.2, 0.1, 0.1])
-
-for i in range(len(tickers)):
-    table.add_cell(i+1, 0, width=0.1, height=0.1, text=tickers[i]) 
-    #price 
-    table.add_cell(i+1, 4, width=0.1, height=0.1, text=round(tickers_data[tickers[i]][-1], 2))
-    # change in percentage
-    table.add_cell(i+1, 5, width=0.1, height=0.1, text=round((tickers_data[tickers[i]][-1] - tickers_data[tickers[i]][-2]) / tickers_data[tickers[i]][-2] * 100, 2))
 
 # Add a slider for the end date 
 ax_end_date = plt.axes([0.25, 0.02, 0.65, 0.03])
@@ -167,6 +182,75 @@ def update_button_play(event):
 
 button_play.on_clicked(update_button_play)
 
+table = tk.Frame(master=root)
+table.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=1)
+
+headers = ['Symbol', 'Name', 'Price', 'Change']
+for j in range(len(headers)):
+    tk.Label(table, text=headers[j], relief=tk.RIDGE, width=20, font=('Arial', 12, 'bold')).grid(row=0, column=j)
+
+def update_entry(event):
+    global tickers_data
+    symbol = event.widget.get()
+    # Check if the symbol exists with yahoo finance 
+    try:
+        ticker = yf.Ticker(symbol).info
+        # Replace in tickers 
+        row = event.widget.grid_info()['row']
+        # replace dataframe column 
+        tickers_data[symbol] = yf.download(symbol, period=period, interval='1wk')['Adj Close']
+        tickers[row-1] = symbol
+        # Update the RRG indicator
+        update_rrg()
+    except Exception as e:
+        print(e)
+        # Reset the entry to the previous symbol
+        entry = event.widget
+        row = entry.grid_info()['row']
+        entry.delete(0, tk.END)
+        entry.insert(0, tickers_metadata_dict['symbol'][row-1])
+
+def update_check_button(event):
+    global tickers_to_show
+
+    check_button = event.widget
+    row = check_button.grid_info()['row']
+    # Get ticker symbol 
+    symbol = tickers_metadata_dict['symbol'][row-1]
+    
+    # If the check button is checked, add the ticker to the list of tickers to show
+    if 'selected' not in check_button.state():
+        tickers_to_show.append(symbol)
+    else:
+        tickers_to_show.remove(symbol)
+
+for i in range(len(tickers_to_show)):
+    # Ticker symbol 
+    symbol = tickers_metadata_dict['symbol'][i]
+    # Ticker name
+    name = tickers_metadata_dict['name'][i]
+    # Ticker price at end date
+    price = tickers_data[symbol][end_date]
+    # Ticker change from start date to end date in percentage
+    chg = (price - tickers_data[symbol][start_date]) / tickers_data[symbol][start_date] * 100
+    bg_color = get_color(rsr_tickers[i][-1], rsm_tickers[i][-1])
+    fg_color = 'white' if bg_color in ['red', 'green'] else 'black'
+    symbol_var = tk.StringVar()
+    symbol_var.set(symbol)
+    entry = tk.Entry(table, textvariable=symbol_var, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12))
+    entry.grid(row=i+1, column=0)
+    entry.bind('<Return>', update_entry)
+    tk.Label(table, text=name, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=1)
+    tk.Label(table, text=price, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=2)
+    tk.Label(table, text=chg, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=3)
+    checkbox_var = tk.BooleanVar()
+    checkbox_var.set(True)
+    # Create the checkbox and add it to the cell
+    checkbox = ttk.Checkbutton(table, variable=checkbox_var, onvalue=True, offvalue=False)
+    checkbox.grid(row=i+1, column=4)
+    checkbox.state(['selected'])
+    checkbox.bind('<Button-1>', update_check_button)
+
 # list of scatter plots for each ticker 
 scatter_plots = [] 
 # list of line plots for each ticker 
@@ -182,6 +266,7 @@ for i in range(len(tickers)):
 # animation function. This is called sequentially 
 def animate(i):
     global start_date, end_date
+
     if not is_playing:
         # take the value from the slider 
         end_date = rsr_tickers[0].index[slider_end_date.val]
@@ -204,25 +289,37 @@ def animate(i):
     for j in range(len(tickers)):
         # if ticker not to be displayed, skip it 
         if tickers[j] not in tickers_to_show:
-            continue
+            scatter_plots[j] = ax[0].scatter([], [])
+            line_plots[j] = ax[0].plot([], [], color='k', alpha=0.2)[0]
+            annotations[j] = ax[0].annotate('', (0, 0), fontsize=8)
 
-        filtered_rsr_tickers = rsr_tickers[j].loc[(rsr_tickers[j].index > start_date) & (rsr_tickers[j].index <= end_date)]
-        filtered_rsm_tickers = rsm_tickers[j].loc[(rsm_tickers[j].index > start_date) & (rsm_tickers[j].index <= end_date)]
-        # Update the scatter
-        color = get_color(filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1])
-        scatter_plots[j] = ax[0].scatter(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color=color, s=marker_size)
-        # Update the line
-        line_plots[j] = ax[0].plot(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color='black', alpha=0.2)[0]
-        # Update the annotation
-        annotations[j] = ax[0].annotate(tickers[j], (filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1]))
-        # Update the table cell price 
-        table._cells[(j+1, 4)]._text.set_text(round(tickers_data[tickers[j]][start_date:end_date].values[-1], 2))
-        # Update the table cell change 
-        table._cells[(j+1, 5)]._text.set_text(round((tickers_data[tickers[j]][start_date:end_date].values[-1] - tickers_data[tickers[j]][start_date:end_date].values[-2]) / tickers_data[tickers[j]][start_date:end_date].values[-2] * 100, 2))
+        else:
+            filtered_rsr_tickers = rsr_tickers[j].loc[(rsr_tickers[j].index > start_date) & (rsr_tickers[j].index <= end_date)]
+            filtered_rsm_tickers = rsm_tickers[j].loc[(rsm_tickers[j].index > start_date) & (rsm_tickers[j].index <= end_date)]
+            # Update the scatter
+            color = get_color(filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1])
+            scatter_plots[j] = ax[0].scatter(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color=color, s=marker_size)
+            # Update the line
+            line_plots[j] = ax[0].plot(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color='black', alpha=0.2)[0]
+            # Update the annotation
+            annotations[j] = ax[0].annotate(tickers[j], (filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1]))
 
-    return scatter_plots + line_plots + annotations + [table]
+        # Update the price and change 
+        name = tickers_metadata_dict['name'][j]
+        price = tickers_data[tickers[j]][end_date]
+        chg = (price - tickers_data[tickers[j]][start_date]) / tickers_data[tickers[j]][start_date] * 100
+        table.grid_slaves(row=j+1, column=1)[0].config(text=name)
+        table.grid_slaves(row=j+1, column=2)[0].config(text=price)
+        table.grid_slaves(row=j+1, column=3)[0].config(text=chg)
+
+        bg_color = get_color(rsr_tickers[j][end_date], rsm_tickers[j][end_date])
+        fg_color = 'white' if bg_color in ['red', 'green', 'blue'] else 'black'
+        for k in range(4):
+            table.grid_slaves(row=j+1, column=k)[0].config(bg=bg_color, fg=fg_color)        
+
+    return scatter_plots + line_plots + annotations
 
 # call the animator. blit=True means only re-draw the parts that have changed.
 anim = animation.FuncAnimation(fig, animate, frames=60, interval=100, blit=True)
 
-plt.show()
+root.mainloop()
