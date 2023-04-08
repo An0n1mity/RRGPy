@@ -7,10 +7,7 @@ from scipy import interpolate
 from matplotlib.widgets import Slider, Button
 import tkinter as tk
 from tkinter import ttk
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg,
-    NavigationToolbar2Tk
-)
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 is_playing = False
 marker_size = []
@@ -18,7 +15,10 @@ tail = 5
 start_date, end_date = None, None
 
 for i in range(tail):
-    marker_size.append((i+1) * 10)
+    if i == tail-1:
+        marker_size.append(50)
+    else:
+        marker_size.append(10)
 
 def get_line_points(x, y):
     # Interpolate a smooth curve through the scatter points
@@ -101,7 +101,7 @@ def update_rrg():
 
 root = tk.Tk()
 root.title('RRG Indicator')
-root.geometry('1000x600')
+root.geometry('1000x650')
 root.resizable(False, False)
 # Create scatter plot of JdK RS Ratio vs JdK RS Momentum
 # Upper plot is JdK RS Ratio vs JdK RS Momentum and below is a table of the status of each ticker
@@ -136,13 +136,14 @@ ax[1].set_axis_off()
 collabels = ['symbol', 'name', 'sector', 'industry', 'price', 'chg']
 
 # Add a slider for the end date 
-ax_end_date = plt.axes([0.25, 0.02, 0.65, 0.03])
-slider_end_date = Slider(ax_end_date, 'Date', tail, len(rsr_tickers[0])-2, valinit=tail, valstep=1)
+ax_end_date = plt.axes([0.25, 0.02, 0.65, 0.03], facecolor='grey')
+slider_end_date = Slider(ax_end_date, 'Date', tail, len(rsr_tickers[0])-2, valinit=tail, valstep=1, initcolor='none', track_color='grey')
+slider_end_date.poly.set_fc('grey')
 date = str(rsr_tickers[0].index[slider_end_date.val]).split(' ')[0]
 slider_end_date.valtext.set_text(date)
 
 def update_slider_end_date(val):
-    date = str(rsr_tickers[0].index[slider_end_date.val]).split(' ')[0]
+    date = str(rsr_tickers[0].index[val]).split(' ')[0]
     slider_end_date.valtext.set_text(date)
 
 slider_end_date.on_changed(update_slider_end_date)
@@ -153,7 +154,8 @@ end_date = rsr_tickers[0].index[slider_end_date.val]
 
 #  Add a slider for the tail 
 ax_tail = plt.axes([0.25, 0.05, 0.65, 0.03])
-slider_tail = Slider(ax_tail, 'Tail', 1, 10, valinit=5, valstep=1)
+slider_tail = Slider(ax_tail, 'Tail', 1, 10, valinit=5, valstep=1, initcolor='none', track_color='grey')
+slider_tail.poly.set_fc('grey')
 
 def update_slider_tail(val):
     global tail
@@ -170,7 +172,10 @@ def update_slider_tail(val):
     tail = slider_tail.val
     marker_size = []
     for i in range(tail):
-        marker_size.append(10 * (i+1))
+        if i == tail-1:
+            marker_size.append(50)
+        else:
+            marker_size.append(10)
 
 slider_tail.on_changed(update_slider_tail)
 
@@ -337,6 +342,8 @@ def animate(i):
             scatter_plots[j] = ax[0].scatter(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color=color, s=marker_size)
             # Update the line
             line_plots[j] = ax[0].plot(filtered_rsr_tickers.values, filtered_rsm_tickers.values, color='black', alpha=0.2)[0]
+            # Update the line with interpolation 
+            #line_plots[j].set_data(get_line_points(filtered_rsr_tickers.values, filtered_rsm_tickers.values))
             # Update the annotation
             annotations[j] = ax[0].annotate(tickers[j], (filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1]))
 
