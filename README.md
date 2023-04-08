@@ -40,5 +40,5 @@ Run the script:
 The script will generate a scatter plot with the JdK RS Ratio on the x-axis and JdK RS Momentum on the y-axis, as well as a table with the current status of each ticker based on their position in the plot. You can change the ticker by clicking on it in the table.
 
 ## Ressources 
-https://marginstone.com/how-to-create-a-relative-rotation-graph-on-excel/
-Book new frontiers in technical analysis: effective tools and strategies for trading and investing paul ciana
+- https://marginstone.com/how-to-create-a-relative-rotation-graph-on-excel/
+- Book new frontiers in technical analysis: effective tools and strategies for trading and investing paul ciana
