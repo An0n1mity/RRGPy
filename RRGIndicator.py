@@ -85,6 +85,7 @@ for i in range(len(tickers)):
     rsm_tickers[i] = rsm_tickers[i][rsm_tickers[i].index.isin(rsr_tickers[i].index)]
 
 def update_rrg():
+    global rs_tickers, rsr_tickers, rsr_roc_tickers, rsm_tickers
     rs_tickers = []
     rsr_tickers = []
     rsr_roc_tickers = []
@@ -99,6 +100,9 @@ def update_rrg():
         rsm_tickers[i] = rsm_tickers[i][rsm_tickers[i].index.isin(rsr_tickers[i].index)]
 
 root = tk.Tk()
+root.title('RRG Indicator')
+root.geometry('1000x600')
+root.resizable(False, False)
 # Create scatter plot of JdK RS Ratio vs JdK RS Momentum
 # Upper plot is JdK RS Ratio vs JdK RS Momentum and below is a table of the status of each ticker
 fig, ax = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 1]})
@@ -117,8 +121,8 @@ ax[0].fill_between([100, 106], [100, 100], [106, 106], color='green', alpha=0.2)
 ax[0].fill_between([94, 100], [100, 100], [106, 106], color='blue', alpha=0.2)
 # Add text labels in each corner
 ax[0].text(95, 105, 'Improving')
-ax[0].text(105, 105, 'Leading')
-ax[0].text(105, 95, 'Weakening')
+ax[0].text(104, 105, 'Leading')
+ax[0].text(104, 95, 'Weakening')
 ax[0].text(95, 95, 'Lagging')
 
 ax[0].set_xlim(94, 106)
@@ -134,10 +138,12 @@ collabels = ['symbol', 'name', 'sector', 'industry', 'price', 'chg']
 # Add a slider for the end date 
 ax_end_date = plt.axes([0.25, 0.02, 0.65, 0.03])
 slider_end_date = Slider(ax_end_date, 'Date', tail, len(rsr_tickers[0])-2, valinit=tail, valstep=1)
-slider_end_date.valtext.set_text(rsr_tickers[0].index[slider_end_date.val])
+date = str(rsr_tickers[0].index[slider_end_date.val]).split(' ')[0]
+slider_end_date.valtext.set_text(date)
 
 def update_slider_end_date(val):
-    slider_end_date.valtext.set_text(rsr_tickers[0].index[slider_end_date.val])
+    date = str(rsr_tickers[0].index[slider_end_date.val]).split(' ')[0]
+    slider_end_date.valtext.set_text(date)
 
 slider_end_date.on_changed(update_slider_end_date)
 
@@ -185,9 +191,10 @@ button_play.on_clicked(update_button_play)
 table = tk.Frame(master=root)
 table.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=1)
 
-headers = ['Symbol', 'Name', 'Price', 'Change']
+headers = ['Symbol', 'Name', 'Price', 'Change', 'Visible']
+widths = [20, 40, 20, 20, 10]
 for j in range(len(headers)):
-    tk.Label(table, text=headers[j], relief=tk.RIDGE, width=20, font=('Arial', 12, 'bold')).grid(row=0, column=j)
+    tk.Label(table, text=headers[j], relief=tk.RIDGE, width=widths[j], font=('Arial', 12, 'bold')).grid(row=0, column=j)
 
 def update_entry(event):
     global tickers_data
@@ -199,7 +206,28 @@ def update_entry(event):
         row = event.widget.grid_info()['row']
         # replace dataframe column 
         tickers_data[symbol] = yf.download(symbol, period=period, interval='1wk')['Adj Close']
+        # If previous symbol is in the ticker to show list, replace it with the new symbol 
+        previous_symbol = tickers_metadata_dict['symbol'][row-1]
+
+        if previous_symbol in tickers_to_show:
+            tickers_to_show.remove(previous_symbol)
+
+        # Check if the symbol need to be displayed 
+        check_button = table.grid_slaves(row=row, column=4)[0]
+        states = check_button.state()
+        if 'selected' in check_button.state() and symbol not in tickers_to_show:
+            tickers_to_show.insert(row-1, symbol)
+
         tickers[row-1] = symbol
+
+        # Check if symbol is in the metadata dictionary 
+        if symbol not in tickers_metadata_dict['symbol']:
+            # Add the symbol to the metadata dictionary
+            tickers_metadata_dict['symbol'][row-1] = symbol
+            tickers_metadata_dict['name'][row-1] = ticker['longName']
+
+        # Update the name label 
+        table.grid_slaves(row=row, column=1)[0].config(text=ticker['longName'])
         # Update the RRG indicator
         update_rrg()
     except Exception as e:
@@ -215,14 +243,21 @@ def update_check_button(event):
 
     check_button = event.widget
     row = check_button.grid_info()['row']
-    # Get ticker symbol 
+    # Get ticker symbol from the table 
     symbol = tickers_metadata_dict['symbol'][row-1]
     
     # If the check button is checked, add the ticker to the list of tickers to show
-    if 'selected' not in check_button.state():
+    if 'selected' not in check_button.state() and symbol not in tickers_to_show:
         tickers_to_show.append(symbol)
-    else:
-        tickers_to_show.remove(symbol)
+    elif 'selected' in check_button.state() and symbol in tickers_to_show:
+        tickers_to_show = [x for x in tickers_to_show if x != symbol]
+
+def on_enter(event):
+    ticker_name = event.widget.cget('text')
+    event.widget.configure(text=ticker_name)
+
+def on_leave(event):
+    event.widget.configure(text='')
 
 for i in range(len(tickers_to_show)):
     # Ticker symbol 
@@ -230,9 +265,9 @@ for i in range(len(tickers_to_show)):
     # Ticker name
     name = tickers_metadata_dict['name'][i]
     # Ticker price at end date
-    price = tickers_data[symbol][end_date]
+    price = round(tickers_data[symbol][end_date], 2)
     # Ticker change from start date to end date in percentage
-    chg = (price - tickers_data[symbol][start_date]) / tickers_data[symbol][start_date] * 100
+    chg = round((price - tickers_data[symbol][start_date]) / tickers_data[symbol][start_date] * 100, 1)
     bg_color = get_color(rsr_tickers[i][-1], rsm_tickers[i][-1])
     fg_color = 'white' if bg_color in ['red', 'green'] else 'black'
     symbol_var = tk.StringVar()
@@ -240,7 +275,7 @@ for i in range(len(tickers_to_show)):
     entry = tk.Entry(table, textvariable=symbol_var, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12))
     entry.grid(row=i+1, column=0)
     entry.bind('<Return>', update_entry)
-    tk.Label(table, text=name, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=1)
+    tk.Label(table, text=name, relief=tk.RIDGE, width=40, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=1)
     tk.Label(table, text=price, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=2)
     tk.Label(table, text=chg, relief=tk.RIDGE, width=20, bg=bg_color, fg=fg_color, font=('Arial', 12)).grid(row=i+1, column=3)
     checkbox_var = tk.BooleanVar()
@@ -250,6 +285,7 @@ for i in range(len(tickers_to_show)):
     checkbox.grid(row=i+1, column=4)
     checkbox.state(['selected'])
     checkbox.bind('<Button-1>', update_check_button)
+
 
 # list of scatter plots for each ticker 
 scatter_plots = [] 
@@ -305,10 +341,8 @@ def animate(i):
             annotations[j] = ax[0].annotate(tickers[j], (filtered_rsr_tickers.values[-1], filtered_rsm_tickers.values[-1]))
 
         # Update the price and change 
-        name = tickers_metadata_dict['name'][j]
-        price = tickers_data[tickers[j]][end_date]
-        chg = (price - tickers_data[tickers[j]][start_date]) / tickers_data[tickers[j]][start_date] * 100
-        table.grid_slaves(row=j+1, column=1)[0].config(text=name)
+        price = round(tickers_data[tickers[j]][end_date], 2)
+        chg = round((price - tickers_data[tickers[j]][start_date]) / tickers_data[tickers[j]][start_date] * 100, 1)
         table.grid_slaves(row=j+1, column=2)[0].config(text=price)
         table.grid_slaves(row=j+1, column=3)[0].config(text=chg)
 
