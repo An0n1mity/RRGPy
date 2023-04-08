@@ -1,6 +1,9 @@
 RRGPy
 
 This script generates a scatter plot of the JdK RS Ratio vs JdK RS Momentum for a set of tickers and displays their current status based on their position in the plot. The RRG (Relative Rotation Graph) Indicator is a visual tool used in technical analysis to identify and compare the relative strength of different assets in a market.
+
+![](rrgpy.gif)
+
 Requirements
 
 This script requires the following libraries:
