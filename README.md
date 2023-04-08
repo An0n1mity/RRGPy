@@ -37,4 +37,4 @@ Run the script:
 
     python rrg_indicator.py
 
-The script will generate a scatter plot with the JdK RS Ratio on the x-axis and JdK RS Momentum on the y-axis, as well as a table with the current status of each ticker based on their position in the plot. You can interact with the plot by clicking on the markers to display their ticker name and value.
+The script will generate a scatter plot with the JdK RS Ratio on the x-axis and JdK RS Momentum on the y-axis, as well as a table with the current status of each ticker based on their position in the plot. You can change the ticker by clicking on it in the table.
