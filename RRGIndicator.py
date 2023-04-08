@@ -49,8 +49,7 @@ def get_color(x, y):
     
 # Retrieve historical prices 
 period = '1y'
-tickers = ['FOO.PA', 'HLT.PA', 'TNO.PA', 'BNK.PA', 'VIE.PA', 'VRLA.PA']
-# 'symbol', 'name', 'sector', 'industry'
+tickers = ['FOO.PA', 'HLT.PA', 'TNO.PA', 'BNK.PA', 'PABZ.PA', 'AUT.PA']
 tickers_metadata_dict = {
     'symbol': [],
     'name': []
